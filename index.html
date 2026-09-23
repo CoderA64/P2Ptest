@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test P2P Trystero - AirDrop / Sala</title>
+    <style>
+        body { font-family: system-ui, sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; background: #f4f4f9; color: #333; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        input, button { padding: 10px; font-size: 16px; margin: 5px 0; }
+        #log { background: #111; color: #0f0; padding: 10px; border-radius: 5px; height: 150px; overflow-y: auto; font-family: monospace; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h2>Pruébalo Tú Mismo (P2P)</h2>
+        <p>Tu código de sala generado automáticamente:</p>
+        <h1 id="my-room-code" style="color: #2563eb;">Generando...</h1>
+        
+        <hr>
+        
+        <h3>Unirse a otra sala</h3>
+        <input type="text" id="room-input" placeholder="Ej: ES-4829">
+        <button id="connect-btn">Conectar</button>
+    </div>
+
+    <div class="card" id="chat-section" style="display:none;">
+        <h3>Canal P2P Activo 🚀</h3>
+        <p>Estado: <span id="status" style="color: orange; font-weight: bold;">Desconectado</span></p>
+        <input type="text" id="message-input" placeholder="Escribe un mensaje..." style="width: 70%;">
+        <button id="send-btn">Enviar</button>
+        <h4>Consola de Datos:</h4>
+        <div id="log"></div>
+    </div>
+
+    <!-- Importamos Trystero desde un CDN oficial (versión BitTorrent) -->
+    <script type="module">
+        import { joinRoom } from 'https://cdn.jsdelivr.net/npm/trystero@0.19.0/torrent.min.js';
+
+        // 1. Generar código automático PP-№№№№
+        function generarCodigoSala() {
+            const locale = navigator.language || "es-XX";
+            const partes = locale.split('-');
+            const pais = partes.length > 1 ? partes[1].toUpperCase() : "XX";
+            const num = Math.floor(1000 + Math.random() * 9000);
+            return `${pais}-${num}`;
+        }
+
+        const codigoGenerado = generarCodigoSala();
+        document.getElementById('my-room-code').innerText = codigoGenerado;
+        
+        // Auto-llenar el input por si quieres unirte a tu propia sala para probar
+        document.getElementById('room-input').value = codigoGenerado;
+
+        let room;
+        let sendDataFn;
+
+        function logToScreen(text) {
+            const logDiv = document.getElementById('log');
+            logDiv.innerHTML += `> ${text}<br>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        // 2. Botón de Conexión
+        document.getElementById('connect-btn').addEventListener('click', () => {
+            const salaAUnirse = document.getElementById('room-input').value.trim();
+            if (!salaAUnirse) return alert("Escribe un código de sala válido");
+
+            document.getElementById('chat-section').style.display = 'block';
+            logToScreen(`Intentando conectar a la sala: ${salaAUnirse}...`);
+
+            // Configuración de Trystero
+            const config = { appId: 'mi-airdrop-web-test-v1' };
+            
+            // Unirse a la sala usando Trystero BitTorrent
+            room = joinRoom(config, salaAUnirse);
+
+            // Crear un canal de datos llamado 'chat'
+            const [send, get] = room.makeAction('chat');
+            sendDataFn = send;
+
+            // Escuchar cuando alguien se conecta a la sala
+            room.onPeerJoin(peerId => {
+                document.getElementById('status').innerText = 'Conectado con Peer!';
+                document.getElementById('status').style.color = 'green';
+                logToScreen(`¡Conectado con éxito con el dispositivo: ${peerId} !`);
+            });
+
+            // Escuchar cuando alguien se desconecta
+            room.onPeerLeave(peerId => {
+                document.getElementById('status').innerText = 'Peer desconectado';
+                document.getElementById('status').style.color = 'red';
+                logToScreen(`El dispositivo ${peerId} se ha desconectado.`);
+            });
+
+            // Recibir mensajes del otro navegador
+            get((data, peerId) => {
+                logToScreen(`Recibido de ${peerId.slice(0,5)}: ${data}`);
+            });
+        });
+
+        // 3. Enviar datos por el canal P2P
+        document.getElementById('send-btn').addEventListener('click', () => {
+            const msgInput = document.getElementById('message-input');
+            const mensaje = msgInput.value;
+            if (!mensaje || !sendDataFn) return;
+
+            // Enviar datos directamente al otro navegador
+            sendDataFn(mensaje);
+            logToScreen(`Tú: ${mensaje}`);
+            msgInput.value = '';
+        });
+    </script>
+</body>
+  </html>
+  
